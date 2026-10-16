@@ -4,6 +4,10 @@ import "../../global.css";
 import {useFonts} from "expo-font";
 import {useEffect} from "react";
 
+/**
+ * Returns null until the configured fonts load, then renders the navigation stack
+ * with headers hidden and requests that the splash screen be hidden.
+ */
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
     'sans-regular': require('@/assets/fonts/PlusJakartaSans-Regular.ttf'),

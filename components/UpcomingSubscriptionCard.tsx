@@ -1,6 +1,10 @@
 import { Image, Text, View } from "react-native";
 import { formatCurrency } from "../lib/utils";
 
+/**
+ * Renders a subscription's icon, price, name, and supplied days remaining.
+ * Displays "Last day" when `daysLeft` is at most 1, including zero or negatives.
+ */
 const UpcomingSubscriptionCard = ({
   name,
   price,

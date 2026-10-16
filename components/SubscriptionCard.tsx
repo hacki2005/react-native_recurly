@@ -6,6 +6,13 @@ import clsx from 'clsx';
 
 
 
+/**
+ * Renders a subscription summary with payment, category, start date, and status
+ * details when expanded. The parent controls expansion through `expanded` and
+ * `onPress`; `color` applies only while collapsed.
+ * Summary metadata uses the first nonempty trimmed category or plan, then the
+ * renewal date when present.
+ */
 const SubscriptionCard = ({name,price,currency,icon,billing,color,category,plan,renewalDate,expanded,onPress,paymentMethod,startDate,status}:SubscriptionCardProps
 ) => {
     return (
