@@ -14,6 +14,10 @@ import SubscriptionCard from "./../../../components/SubscriptionCard";
 import {useState} from "react";
 const SafeAreaView = styled(RnSafeAreaView);
  
+/**
+ * Renders the home dashboard from the predefined user, balance, and subscription
+ * data. Pressing a subscription toggles its details; at most one is expanded.
+ */
 export default function App() {
   const
   [expandedSubscriptionId, setExpandedSubscriptionId] = useState<string | null>(null)

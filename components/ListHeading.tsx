@@ -1,6 +1,7 @@
 import { View, Text, TouchableOpacity } from 'react-native'
 import React from 'react'
 
+/** Renders a section title and a "View all" control without a press handler. */
 const ListHeading = ({title}:ListHeadingProps) => {
   return (
     <View>
