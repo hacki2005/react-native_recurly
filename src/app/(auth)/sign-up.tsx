@@ -7,7 +7,7 @@ const SignUp = () => {
   return (
     <View>
           <Text>SignUp</Text>
-          <Link href="/(auth)/sign-up">
+          <Link href="/(auth)/sign-in">
           Sign In</Link>
     </View>
   )

@@ -1,15 +1,18 @@
-import {SplashScreen, Stack} from "expo-router";
+import {Stack} from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
 
 import "../../global.css";
 import {useFonts} from "expo-font";
 import {useEffect} from "react";
 
+void SplashScreen.preventAutoHideAsync().catch(console.warn);
+
 /**
- * Returns null until the configured fonts load, then renders the navigation stack
- * with headers hidden and requests that the splash screen be hidden.
+ * Keeps the splash screen visible while fonts load, then renders navigation.
+ * If font loading fails, navigation still renders with fallback fonts.
  */
 export default function RootLayout() {
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     'sans-regular': require('@/assets/fonts/PlusJakartaSans-Regular.ttf'),
     'sans-bold': require('@/assets/fonts/PlusJakartaSans-Bold.ttf'),
     'sans-medium': require('@/assets/fonts/PlusJakartaSans-Medium.ttf'),
@@ -20,13 +23,11 @@ export default function RootLayout() {
   })
 
   useEffect(() => {
-    if(fontsLoaded){
-      SplashScreen.hideAsync()
+    if(fontsLoaded || fontError){
+      SplashScreen.hide()
     }
-  }, [fontsLoaded]);
+  }, [fontsLoaded, fontError]);
 
-  if (!fontsLoaded) return null
+  if (!fontsLoaded && !fontError) return null
   return <Stack screenOptions={{headerShown:false}}/>;
 }
-
-

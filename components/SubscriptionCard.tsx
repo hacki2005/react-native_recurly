@@ -39,7 +39,7 @@ const SubscriptionCard = ({name,price,currency,icon,billing,color,category,plan,
               </View>
       </View>
             {expanded && (
-                <View className="sub-bdy">
+                <View className="sub-body">
                    <View className="sub-details">
                         <View className="sub-row">
                             <View className="sub-row-copy">

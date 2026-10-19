@@ -1,11 +1,11 @@
 import "../../../global.css"
 import { FlatList, Image,Text, View } from "react-native";
-import { Link } from "expo-router";
+import { router } from "expo-router";
 import dayjs from "dayjs"
 import {SafeAreaView as RnSafeAreaView} from "react-native-safe-area-context";
 import {styled} from "nativewind";
 import images from "../../../constants/images";
-import { HOME_BALANCE, HOME_SUBSCRIPTIONS, HOME_USER, UPCOMING_SUBSCRIPTIONS,  } from "../../../constants/data";
+import { DEMO_NOTICE, HOME_BALANCE, HOME_SUBSCRIPTIONS, HOME_USER, UPCOMING_SUBSCRIPTIONS,  } from "../../../constants/data";
 import { icons } from "../../../constants/icons";
 import { formatCurrency } from "./../../../lib/utils";
 import ListHeading from "../../../components/ListHeading";
@@ -13,7 +13,7 @@ import UpcomingSubscriptionCard from "../../../components/UpcomingSubscriptionCa
 import SubscriptionCard from "./../../../components/SubscriptionCard";
 import {useState} from "react";
 const SafeAreaView = styled(RnSafeAreaView);
- 
+
 /**
  * Renders the home dashboard from the predefined user, balance, and subscription
  * data. Pressing a subscription toggles its details; at most one is expanded.
@@ -29,6 +29,7 @@ export default function App() {
           <FlatList
               ListHeaderComponent={() => (
                  <>
+                 <Text className="home-empty-state">{DEMO_NOTICE}</Text>
                  <View className="home-header">
                      <View className="home-user">
                          <Image source={images.avatar} className="home-avatar" />
@@ -64,7 +65,8 @@ export default function App() {
                      />
                  </View>
 
-                     <ListHeading title="All subscription" />
+                     <ListHeading title="All subscriptions"
+                         onPress={() => router.navigate("/(tabs)/subscriptions")} />
                  </>
               )}
               data={HOME_SUBSCRIPTIONS}
@@ -88,7 +90,7 @@ export default function App() {
           />
 
 
-      
+
     </SafeAreaView>
   )
 }

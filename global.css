@@ -45,7 +45,7 @@
     --font-sans-extrabold: sans-extrabold;
 }
 
-@layer components {
+/* Keep component styles above React Native Web defaults in the cascade. */
     .tabs-icon {
         @apply size-12 items-center justify-center;
     }
@@ -59,7 +59,7 @@
     }
 
     .tabs-glyph {
-        @apply size-6;
+        @apply size-6!;
     }
 
     .home-header {
@@ -71,7 +71,7 @@
     }
 
     .home-avatar {
-        @apply size-16 rounded-full;
+        @apply size-16! rounded-full;
     }
 
     .home-user-name {
@@ -79,7 +79,7 @@
     }
 
     .home-add-icon {
-        @apply size-12;
+        @apply size-12!;
     }
 
     .home-balance-card {
@@ -127,7 +127,7 @@
     }
 
     .upcoming-icon {
-        @apply size-14;
+        @apply size-14!;
     }
 
     .upcoming-price {
@@ -159,7 +159,7 @@
     }
 
     .sub-icon {
-        @apply size-16 rounded-lg;
+        @apply size-16! rounded-lg;
     }
 
     .sub-copy {
@@ -417,7 +417,3 @@
     .category-chip-text-active {
         @apply text-accent;
     }
-}
-
-
-

@@ -11,6 +11,8 @@ export const HOME_USER = {
     name: "Sri hari",
 };
 
+export const DEMO_NOTICE = "Demo data: sample dates and renewal countdowns";
+
 export const HOME_BALANCE = {
     amount: 1000,
     nextRenewalDate: "2026-03-18T09:00:00.000Z",
