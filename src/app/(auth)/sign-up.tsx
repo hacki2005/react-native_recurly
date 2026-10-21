@@ -13,6 +13,7 @@ import { Link } from "expo-router";
 import { useSignUp } from "@clerk/expo";
 import { SafeAreaView as RnSafeAreaView } from "react-native-safe-area-context";
 import { styled } from "nativewind";
+import { posthog, posthogLog } from "../../../lib/posthog";
 
 const SafeAreaView = styled(RnSafeAreaView);
 
@@ -66,6 +67,8 @@ const SignUp = () => {
 
     if (signUp.status === "complete") {
       await signUp.finalize(); // Stack.Protected handles the redirect
+      posthogLog.info("authentication completed", { auth_flow: "sign_up" });
+      posthog?.capture("sign_up_completed");
     } else {
       setError("Verification could not be completed. Please try again.");
     }

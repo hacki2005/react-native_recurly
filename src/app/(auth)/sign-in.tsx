@@ -13,6 +13,7 @@ import { Link, useRouter } from "expo-router";
 import { useSignIn } from "@clerk/expo";
 import { SafeAreaView as RnSafeAreaView } from "react-native-safe-area-context";
 import { styled } from "nativewind";
+import { posthog, posthogLog } from "../../../lib/posthog";
 
 const SafeAreaView = styled(RnSafeAreaView);
 const HOME_ROUTE = "/";
@@ -67,6 +68,8 @@ const SignIn = () => {
           }
         },
       });
+      posthogLog.info("authentication completed", { auth_flow: "sign_in" });
+      posthog?.capture("sign_in_completed");
     } else {
       setError("Sign-in could not be completed. Please try again.");
     }

@@ -1,8 +1,10 @@
 import {SplashScreen, Stack} from "expo-router";
-import {ClerkProvider, useAuth, useSession} from "@clerk/expo";
+import {ClerkProvider, useAuth, useSession, useUser} from "@clerk/expo";
 import {tokenCache} from "@clerk/expo/token-cache";
+import {PostHogProvider} from "posthog-react-native";
 
 import "../../global.css";
+import {posthog} from "../../lib/posthog";
 import {useFonts} from "expo-font";
 import {useEffect} from "react";
 
@@ -17,8 +19,8 @@ if (!publishableKey) {
 function RootNavigator() {
   const {isLoaded, isSignedIn} = useAuth()
   const {session} = useSession()
+  const {user} = useUser()
 
-  
   const [fontsLoaded] = useFonts({
     'sans-regular': require('@/assets/fonts/PlusJakartaSans-Regular.ttf'),
     'sans-bold': require('@/assets/fonts/PlusJakartaSans-Bold.ttf'),
@@ -33,6 +35,19 @@ function RootNavigator() {
       SplashScreen.hideAsync()
     }
   }, [fontsLoaded, isLoaded]);
+
+  useEffect(() => {
+    if (!isSignedIn || !user?.id) return
+
+    posthog?.identify(user.id, {
+      $set: {
+        ...(user.primaryEmailAddress?.emailAddress
+          ? {email: user.primaryEmailAddress.emailAddress}
+          : {}),
+        ...(user.fullName ? {name: user.fullName} : {}),
+      },
+    })
+  }, [isSignedIn, user?.id, user?.primaryEmailAddress?.emailAddress, user?.fullName])
 
   if (!fontsLoaded || !isLoaded) return null
 
@@ -52,7 +67,13 @@ function RootNavigator() {
 export default function RootLayout() {
   return (
     <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
-      <RootNavigator/>
+      {posthog ? (
+        <PostHogProvider client={posthog}>
+          <RootNavigator/>
+        </PostHogProvider>
+      ) : (
+        <RootNavigator/>
+      )}
     </ClerkProvider>
   )
 }

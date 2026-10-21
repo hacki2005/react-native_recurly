@@ -12,6 +12,7 @@ import ListHeading from "../../../components/ListHeading";
 import UpcomingSubscriptionCard from "../../../components/UpcomingSubscriptionCard";
 import SubscriptionCard from "./../../../components/SubscriptionCard";
 import {useState} from "react";
+import { posthog, posthogLog } from "../../../lib/posthog";
 const SafeAreaView = styled(RnSafeAreaView);
  
 /**
@@ -21,6 +22,19 @@ const SafeAreaView = styled(RnSafeAreaView);
 export default function App() {
   const
   [expandedSubscriptionId, setExpandedSubscriptionId] = useState<string | null>(null)
+
+  const handleSubscriptionPress = (subscriptionId: string) => {
+    if (expandedSubscriptionId !== subscriptionId) {
+      posthogLog.info("subscription details opened", { screen: "dashboard" });
+      posthog?.capture("subscription_details_opened", {
+        subscription_id: subscriptionId,
+      });
+    }
+
+    setExpandedSubscriptionId((currentId) =>
+      currentId === subscriptionId ? null : subscriptionId
+    );
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-background p-5">
@@ -73,8 +87,7 @@ export default function App() {
                         (<SubscriptionCard
                             {...item}
                             expanded={expandedSubscriptionId === item.id}
-                            onPress={()=>setExpandedSubscriptionId((currentId)=>
-                                (currentId === item.id ? null : item.id))}
+                            onPress={() => handleSubscriptionPress(item.id)}
                         />
                         )}
               extraData={expandedSubscriptionId}
