@@ -1,6 +1,6 @@
 import "../../../global.css"
 import { FlatList, Image,Text, View } from "react-native";
-import { Link } from "expo-router";
+import { useUser } from "@clerk/expo";
 import dayjs from "dayjs"
 import {SafeAreaView as RnSafeAreaView} from "react-native-safe-area-context";
 import {styled} from "nativewind";
@@ -20,6 +20,12 @@ const SafeAreaView = styled(RnSafeAreaView);
  * data. Pressing a subscription toggles its details; at most one is expanded.
  */
 export default function App() {
+  const { user, isLoaded } = useUser();
+  const homeUserName =
+    user?.fullName?.trim() ||
+    user?.firstName?.trim() ||
+    user?.username?.trim() ||
+    (isLoaded ? `Sample data: ${HOME_USER.name}` : "");
   const
   [expandedSubscriptionId, setExpandedSubscriptionId] = useState<string | null>(null)
 
@@ -46,7 +52,7 @@ export default function App() {
                  <View className="home-header">
                      <View className="home-user">
                          <Image source={images.avatar} className="home-avatar" />
-                         <Text className="home-user-name">{HOME_USER.name}</Text>
+                         <Text className="home-user-name">{homeUserName}</Text>
                      </View>
                      <Image source={icons.add} className="home-add-icon"></Image>
                  </View>

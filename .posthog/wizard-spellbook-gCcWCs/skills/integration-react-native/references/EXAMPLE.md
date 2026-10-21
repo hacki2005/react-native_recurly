@@ -115,7 +115,7 @@ POSTHOG_HOST=https://us.i.posthog.com
 
 Get your PostHog project token from your [PostHog project settings](https://app.posthog.com/project/settings).
 
-> **Note:** The app will still run without a PostHog project token - analytics will simply be disabled.
+> **Note:** Development/debug builds fail with `POSTHOG_PROJECT_TOKEN is required` when the token is missing. Production builds remain disabled no-ops without a token.
 
 ### 3. Run on iOS
 
@@ -210,7 +210,10 @@ import PostHog from 'posthog-react-native'
 import Config from 'react-native-config'
 
 const projectToken = Config.POSTHOG_PROJECT_TOKEN
-const isPostHogConfigured = projectToken && projectToken !== 'phc_your_project_token_here'
+const isPostHogConfigured = Boolean(projectToken && projectToken !== 'phc_your_project_token_here')
+if (!isPostHogConfigured && __DEV__) {
+  throw new Error('POSTHOG_PROJECT_TOKEN is required')
+}
 
 export const posthog = new PostHog(projectToken || 'placeholder_key', {
   host: Config.POSTHOG_HOST || 'https://us.i.posthog.com',
@@ -240,7 +243,11 @@ export default function App() {
     <NavigationContainer
       ref={navigationRef}
       onReady={() => {
-        routeNameRef.current = navigationRef.current?.getCurrentRoute()?.name
+        const initialRouteName = navigationRef.current?.getCurrentRoute()?.name
+        routeNameRef.current = initialRouteName
+        if (initialRouteName) {
+          posthog.screen(initialRouteName)
+        }
       }}
       onStateChange={() => {
         // Manual screen tracking for React Navigation v7
@@ -297,7 +304,7 @@ import { usePostHog } from 'posthog-react-native'
 const posthog = usePostHog()
 
 // On login - identify with person properties
-posthog.identify(username, {
+posthog.identify(user.id, {
   $set: {
     username: username,
   },
@@ -1279,13 +1286,10 @@ import Config from 'react-native-config'
 // Ensure .env file exists with POSTHOG_PROJECT_TOKEN and POSTHOG_HOST
 const projectToken = Config.POSTHOG_PROJECT_TOKEN
 const host = Config.POSTHOG_HOST || 'https://us.i.posthog.com'
-const isPostHogConfigured = projectToken && projectToken !== 'phc_your_project_token_here'
+const isPostHogConfigured = Boolean(projectToken && projectToken !== 'phc_your_project_token_here')
 
-if (!isPostHogConfigured) {
-  console.warn(
-    'PostHog project token not configured. Analytics will be disabled. ' +
-    'Set POSTHOG_PROJECT_TOKEN in your .env file to enable analytics.'
-  )
+if (!isPostHogConfigured && __DEV__) {
+  throw new Error('POSTHOG_PROJECT_TOKEN is required')
 }
 
 /**
@@ -1293,6 +1297,7 @@ if (!isPostHogConfigured) {
  *
  * Configuration loaded from .env via react-native-config (embedded at build time).
  * Required peer dependencies: @react-native-async-storage/async-storage,
+ * react-native-svg,
  * react-native-device-info, react-native-localize
  *
  * @see https://posthog.com/docs/libraries/react-native
@@ -2481,4 +2486,3 @@ declare module 'react-native-config' {
 ```
 
 ---
-

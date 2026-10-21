@@ -1,18 +1,23 @@
-import { View, Text, TouchableOpacity } from 'react-native'
+import { View, Text, Pressable } from 'react-native'
 import React from 'react'
 
-/** Renders a section title and a "View all" control without a press handler. */
-const ListHeading = ({title}:ListHeadingProps) => {
+const ListHeading = ({ title, onPress }: ListHeadingProps) => {
   return (
     <View>
-          <Text
-              className='list-title'>{title}</Text>
-          
-          <TouchableOpacity className='list-action'>
-              <Text className='list-action-text'>
-                  View all
-              </Text>
-          </TouchableOpacity>
+      <Text className="list-title">{title}</Text>
+      {onPress ? (
+        <Pressable
+          className="list-action"
+          onPress={onPress}
+          accessibilityRole="button"
+        >
+          <Text className="list-action-text">View all</Text>
+        </Pressable>
+      ) : (
+        <View className="list-action">
+          <Text className="list-action-text">View all</Text>
+        </View>
+      )}
     </View>
   )
 }

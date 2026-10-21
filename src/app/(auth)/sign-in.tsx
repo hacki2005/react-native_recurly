@@ -51,6 +51,7 @@ const SignIn = () => {
     }
 
     if (signIn.status === "complete") {
+      let didNavigate = false;
       await signIn.finalize({
         navigate: ({ session, decorateUrl }) => {
           // A required extra step (MFA, etc.) is still pending
@@ -66,10 +67,13 @@ const SignIn = () => {
           } else {
             router.replace(url as any); // native
           }
+          didNavigate = true;
         },
       });
-      posthogLog.info("authentication completed", { auth_flow: "sign_in" });
-      posthog?.capture("sign_in_completed");
+      if (didNavigate) {
+        posthogLog.info("authentication completed", { auth_flow: "sign_in" });
+        posthog?.capture("sign_in_completed");
+      }
     } else {
       setError("Sign-in could not be completed. Please try again.");
     }

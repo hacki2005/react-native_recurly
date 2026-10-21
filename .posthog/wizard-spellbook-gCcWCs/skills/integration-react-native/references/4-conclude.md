@@ -32,7 +32,7 @@ Create the parent dashboard first with `dashboard-create`, capture its returned 
 {
   "name": "Analytics basics (wizard)",
   "description": "Key views for the events instrumented by the PostHog wizard.",
-  "tags": ["wizard"]
+  "tags": ["(wizard)"]
 }
 ```
 

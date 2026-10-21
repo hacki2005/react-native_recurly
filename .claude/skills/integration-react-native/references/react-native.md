@@ -13,7 +13,7 @@ To install, add the `posthog-react-native` package to your project as well as th
 Terminal
 
 ```bash
-npx expo install posthog-react-native expo-file-system expo-application expo-device expo-localization
+npx expo install posthog-react-native react-native-svg expo-file-system expo-application expo-device expo-localization
 ```
 
 #### React Native apps
@@ -21,9 +21,9 @@ npx expo install posthog-react-native expo-file-system expo-application expo-dev
 Terminal
 
 ```bash
-yarn add posthog-react-native @react-native-async-storage/async-storage react-native-device-info react-native-localize
+yarn add posthog-react-native react-native-svg @react-native-async-storage/async-storage react-native-device-info react-native-localize
 # or
-npm i -s posthog-react-native @react-native-async-storage/async-storage react-native-device-info react-native-localize
+npm i -s posthog-react-native react-native-svg @react-native-async-storage/async-storage react-native-device-info react-native-localize
 ```
 
 #### React Native Web and macOS
@@ -815,6 +815,7 @@ React Native
 
 ```jsx
 import { useFeatureFlag } from 'posthog-react-native'
+import { View } from 'react-native'
 
 const MyComponent = () => {
     const booleanFlag = useFeatureFlag('key-for-your-boolean-flag')
@@ -849,7 +850,7 @@ const MyComponent = () => {
 
     // Optional use the 'useFeatureFlagWithPayload' hook for fetching the feature flag payload
 
-    return <div/>
+    return <View />
 }
 ```
 
@@ -943,7 +944,7 @@ React Native
 
 ```jsx
 if (lastActiveDate < migrationDate) {
-  posthog.reset() // Clears all cached data
+  posthog.reloadFeatureFlags() // Refreshes flags without changing identity
 }
 ```
 
@@ -1297,7 +1298,7 @@ posthog.debug()
 
 ## Disabling for local development
 
-You may want to disable PostHog when working locally or in a test environment. You can do this by setting the `disable` option to `true` when initializing PostHog. Helpfully this allows you to continue using `usePostHog` and safely calling it without anything actually happening.
+You may want to disable PostHog when working locally or in a test environment. You can do this by setting the `disabled` option to `true` when initializing PostHog. Helpfully this allows you to continue using `usePostHog` and safely calling it without anything actually happening.
 
 React Native
 
@@ -1362,7 +1363,7 @@ PostHog.capture("foo")
 // V2 Setup difference
 import PostHog from 'posthog-react-native'
 
-const posthog = await Posthog.initAsync('<ph_project_token>', {
+const posthog = await PostHog.initAsync('<ph_project_token>', {
     // usually 'https://us.i.posthog.com' or 'https://eu.i.posthog.com'
     host: 'https://us.i.posthog.com',
     // Add any other options here.
