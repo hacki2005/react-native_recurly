@@ -3,7 +3,7 @@ import { Text, View, Image, Pressable, ActivityIndicator, Alert } from "react-na
 import { SafeAreaView as RnSafeAreaView } from "react-native-safe-area-context";
 import { styled } from "nativewind";
 import { useClerk, useUser } from "@clerk/expo";
-import { posthog, posthogLog } from "../../../lib/posthog";
+import { posthog } from "../../../lib/posthog";
 
 const SafeAreaView = styled(RnSafeAreaView);
 
@@ -40,7 +40,6 @@ const Settings = () => {
     setIsSigningOut(true);
     try {
       await signOut();
-      posthogLog.info("authentication completed", { auth_flow: "sign_out" });
       posthog?.capture("user_signed_out");
       posthog?.reset();
       // _layout.tsx Stack.Protected guards redirect to (auth) once isSignedIn flips to false.

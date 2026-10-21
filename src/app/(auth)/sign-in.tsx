@@ -1,167 +1,774 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
-  ScrollView,
   Text,
   TextInput,
   View,
 } from "react-native";
-import { Link, useRouter } from "expo-router";
+import { Link } from "expo-router";
 import { useSignIn } from "@clerk/expo";
-import { SafeAreaView as RnSafeAreaView } from "react-native-safe-area-context";
-import { styled } from "nativewind";
-import { posthog, posthogLog } from "../../../lib/posthog";
+import AuthScreen from "../../../components/auth/AuthScreen";
+import { getAuthErrorMessage, isValidEmail, normalizeEmail } from "../../../lib/auth-utils";
+import { posthog } from "../../../lib/posthog";
 
-const SafeAreaView = styled(RnSafeAreaView);
-const HOME_ROUTE = "/";
+type AuthStep = "password" | "email-code" | "reset-code" | "new-password";
 
-const SignIn = () => {
-  const router = useRouter();
+const MFA_STRATEGIES = ["email_code", "phone_code", "totp", "backup_code"];
+
+const mfaLabel = (strategy: string) => {
+  switch (strategy) {
+    case "email_code":
+      return "Email code";
+    case "phone_code":
+      return "Text message";
+    case "totp":
+      return "Authenticator app";
+    case "backup_code":
+      return "Backup code";
+    default:
+      return strategy;
+  }
+};
+
+export default function SignIn() {
   const { signIn, fetchStatus } = useSignIn();
-  const loading = fetchStatus === "fetching";
-
+  const [step, setStep] = useState<AuthStep>("password");
   const [emailAddress, setEmailAddress] = useState("");
   const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [selectedMfaStrategy, setSelectedMfaStrategy] = useState<string | null>(
+    null
+  );
+  const [mfaCodeSent, setMfaCodeSent] = useState(false);
   const [error, setError] = useState("");
+  const [finalizeRequested, setFinalizeRequested] = useState(false);
+  const [isFinalizing, setIsFinalizing] = useState(false);
+  const finalizeStarted = useRef(false);
 
-  const onSignInPress = async () => {
+  const loading = fetchStatus === "fetching" || isFinalizing;
+  const supportedMfaStrategies = [
+    ...new Set(
+      signIn.supportedSecondFactors
+        .map(({ strategy }) => strategy)
+        .filter((strategy) => MFA_STRATEGIES.includes(strategy))
+    ),
+  ];
+  const activeMfaStrategy =
+    selectedMfaStrategy &&
+    supportedMfaStrategies.includes(
+      selectedMfaStrategy as (typeof supportedMfaStrategies)[number]
+    )
+      ? selectedMfaStrategy
+      : supportedMfaStrategies[0];
+  const isMfaStep =
+    signIn.status === "needs_second_factor" ||
+    signIn.status === "needs_client_trust";
+  const showNewPassword =
+    step === "new-password" || signIn.status === "needs_new_password";
+
+  useEffect(() => {
+    if (
+      !finalizeRequested ||
+      signIn.status !== "complete" ||
+      finalizeStarted.current
+    ) {
+      return;
+    }
+
+    finalizeStarted.current = true;
+    setIsFinalizing(true);
+    void signIn
+      .finalize()
+      .then(({ error: finalizeError }) => {
+        if (finalizeError) {
+          setError(
+            getAuthErrorMessage(
+              finalizeError,
+              "Your session could not be started. Please try again."
+            )
+          );
+          finalizeStarted.current = false;
+          return;
+        }
+
+        posthog?.capture("sign_in_completed");
+      })
+      .catch((finalizeError: unknown) => {
+        setError(
+          getAuthErrorMessage(
+            finalizeError,
+            "Your session could not be started. Please try again."
+          )
+        );
+        finalizeStarted.current = false;
+      })
+      .finally(() => setIsFinalizing(false));
+  }, [finalizeRequested, signIn, signIn.status]);
+
+  const validateEmail = () => {
+    if (!isValidEmail(emailAddress)) {
+      setError("Enter a valid email address to continue.");
+      return false;
+    }
+    return true;
+  };
+
+  const handlePasswordSignIn = async () => {
     if (loading) return;
+    setError("");
+    if (!validateEmail()) return;
+    if (!password) {
+      setError("Enter your password to continue.");
+      return;
+    }
 
-    if (!emailAddress.trim() || !password) {
-      setError("Please enter your email and password.");
+    finalizeStarted.current = false;
+    setFinalizeRequested(false);
+    try {
+      const { error: signInError } = await signIn.password({
+        identifier: normalizeEmail(emailAddress),
+        password,
+      });
+      if (signInError) {
+        setError(
+          getAuthErrorMessage(
+            signInError,
+            "We couldn’t sign you in. Check your details and try again."
+          )
+        );
+        return;
+      }
+      setFinalizeRequested(true);
+    } catch (signInError: unknown) {
+      setError(
+        getAuthErrorMessage(
+          signInError,
+          "We couldn’t sign you in. Please try again."
+        )
+      );
+    }
+  };
+
+  const handleSendEmailCode = async () => {
+    if (loading) return;
+    setError("");
+    if (!validateEmail()) return;
+
+    try {
+      const { error: createError } = await signIn.create({
+        identifier: normalizeEmail(emailAddress),
+      });
+      if (createError) {
+        setError(
+          getAuthErrorMessage(
+            createError,
+            "We couldn’t start email sign-in. Please try again."
+          )
+        );
+        return;
+      }
+
+      const { error: sendError } = await signIn.emailCode.sendCode();
+      if (sendError) {
+        setError(
+          getAuthErrorMessage(
+            sendError,
+            "We couldn’t send a sign-in code. Please try again."
+          )
+        );
+        return;
+      }
+
+      setCode("");
+      setStep("email-code");
+    } catch (sendError: unknown) {
+      setError(
+        getAuthErrorMessage(
+          sendError,
+          "We couldn’t send a sign-in code. Please try again."
+        )
+      );
+    }
+  };
+
+  const handleRequestPasswordReset = async () => {
+    if (loading) return;
+    setError("");
+    if (!validateEmail()) return;
+
+    try {
+      const { error: createError } = await signIn.create({
+        identifier: normalizeEmail(emailAddress),
+      });
+      if (createError) {
+        setError(
+          getAuthErrorMessage(
+            createError,
+            "We couldn’t start password recovery. Please try again."
+          )
+        );
+        return;
+      }
+
+      const { error: sendError } =
+        await signIn.resetPasswordEmailCode.sendCode();
+      if (sendError) {
+        setError(
+          getAuthErrorMessage(
+            sendError,
+            "We couldn’t send a recovery code. Please try again."
+          )
+        );
+        return;
+      }
+
+      setCode("");
+      setStep("reset-code");
+    } catch (resetError: unknown) {
+      setError(
+        getAuthErrorMessage(
+          resetError,
+          "We couldn’t start password recovery. Please try again."
+        )
+      );
+    }
+  };
+
+  const handleVerifyCode = async () => {
+    if (loading) return;
+    const trimmedCode = code.trim();
+    if (!trimmedCode) {
+      setError("Enter the code we sent you.");
       return;
     }
     setError("");
 
-    const { error: signInErr } = await signIn.password({
-      identifier: emailAddress.trim(),
-      password,
-    });
-
-    if (signInErr) {
-      setError(
-        (signInErr as any).longMessage ||
-          (signInErr as any).message ||
-          "Something went wrong. Please try again."
-      );
-      return;
-    }
-
-    if (signIn.status === "complete") {
-      let didNavigate = false;
-      await signIn.finalize({
-        navigate: ({ session, decorateUrl }) => {
-          // A required extra step (MFA, etc.) is still pending
-          if (session?.currentTask) {
-            console.log("Pending task:", session.currentTask);
-            setError("Additional verification is required to finish signing in.");
-            return;
-          }
-
-          const url = decorateUrl(HOME_ROUTE);
-          if (url.startsWith("http")) {
-            window.location.href = url; // web
-          } else {
-            router.replace(url as any); // native
-          }
-          didNavigate = true;
-        },
-      });
-      if (didNavigate) {
-        posthogLog.info("authentication completed", { auth_flow: "sign_in" });
-        posthog?.capture("sign_in_completed");
+    try {
+      const { error: verifyError } =
+        step === "reset-code"
+          ? await signIn.resetPasswordEmailCode.verifyCode({
+              code: trimmedCode,
+            })
+          : await signIn.emailCode.verifyCode({ code: trimmedCode });
+      if (verifyError) {
+        setError(
+          getAuthErrorMessage(
+            verifyError,
+            "That code could not be verified. Check it and try again."
+          )
+        );
+        return;
       }
-    } else {
-      setError("Sign-in could not be completed. Please try again.");
+
+      if (step === "reset-code") {
+        setStep("new-password");
+      } else {
+        setFinalizeRequested(true);
+      }
+    } catch (verifyError: unknown) {
+      setError(
+        getAuthErrorMessage(
+          verifyError,
+          "That code could not be verified. Check it and try again."
+        )
+      );
     }
   };
 
+  const handleResendCode = async () => {
+    if (loading) return;
+    setError("");
+    try {
+      const { error: sendError } =
+        step === "reset-code"
+          ? await signIn.resetPasswordEmailCode.sendCode()
+          : await signIn.emailCode.sendCode();
+      if (sendError) {
+        setError(
+          getAuthErrorMessage(
+            sendError,
+            "We couldn’t send another code. Please try again."
+          )
+        );
+      }
+    } catch (sendError: unknown) {
+      setError(
+        getAuthErrorMessage(
+          sendError,
+          "We couldn’t send another code. Please try again."
+        )
+      );
+    }
+  };
+
+  const handleSendMfaCode = async () => {
+    if (loading || !activeMfaStrategy) return;
+    setError("");
+    try {
+      const result =
+        activeMfaStrategy === "email_code"
+          ? await signIn.mfa.sendEmailCode()
+          : activeMfaStrategy === "phone_code"
+            ? await signIn.mfa.sendPhoneCode()
+            : null;
+      if (result?.error) {
+        setError(
+          getAuthErrorMessage(
+            result.error,
+            "We couldn’t send a verification code. Please try again."
+          )
+        );
+        return;
+      }
+      setCode("");
+      setMfaCodeSent(true);
+    } catch (sendError: unknown) {
+      setError(
+        getAuthErrorMessage(
+          sendError,
+          "We couldn’t send a verification code. Please try again."
+        )
+      );
+    }
+  };
+
+  const handleVerifyMfa = async () => {
+    if (loading || !activeMfaStrategy) return;
+    const trimmedCode = code.trim();
+    if (!trimmedCode) {
+      setError("Enter your verification code to continue.");
+      return;
+    }
+    setError("");
+
+    try {
+      const result =
+        activeMfaStrategy === "email_code"
+          ? await signIn.mfa.verifyEmailCode({ code: trimmedCode })
+          : activeMfaStrategy === "phone_code"
+            ? await signIn.mfa.verifyPhoneCode({ code: trimmedCode })
+            : activeMfaStrategy === "totp"
+              ? await signIn.mfa.verifyTOTP({ code: trimmedCode })
+              : await signIn.mfa.verifyBackupCode({ code: trimmedCode });
+      if (result.error) {
+        setError(
+          getAuthErrorMessage(
+            result.error,
+            "That verification code could not be accepted. Try again."
+          )
+        );
+        return;
+      }
+      setFinalizeRequested(true);
+    } catch (verifyError: unknown) {
+      setError(
+        getAuthErrorMessage(
+          verifyError,
+          "That verification code could not be accepted. Try again."
+        )
+      );
+    }
+  };
+
+  const handleSubmitNewPassword = async () => {
+    if (loading) return;
+    setError("");
+    if (newPassword.length < 8) {
+      setError("Choose a password with at least 8 characters.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError("Your passwords do not match.");
+      return;
+    }
+
+    try {
+      const { error: passwordError } =
+        await signIn.resetPasswordEmailCode.submitPassword({
+          password: newPassword,
+        });
+      if (passwordError) {
+        setError(
+          getAuthErrorMessage(
+            passwordError,
+            "We couldn’t update your password. Please try again."
+          )
+        );
+        return;
+      }
+      setFinalizeRequested(true);
+    } catch (passwordError: unknown) {
+      setError(
+        getAuthErrorMessage(
+          passwordError,
+          "We couldn’t update your password. Please try again."
+        )
+      );
+    }
+  };
+
+  const handleChangeEmail = async () => {
+    if (loading) return;
+    try {
+      const { error: resetError } = await signIn.reset();
+      if (resetError) {
+        setError(
+          getAuthErrorMessage(
+            resetError,
+            "We couldn’t restart sign-in. Please try again."
+          )
+        );
+        return;
+      }
+      setStep("password");
+      setCode("");
+      setSelectedMfaStrategy(null);
+      setMfaCodeSent(false);
+      setError("");
+    } catch (resetError: unknown) {
+      setError(
+        getAuthErrorMessage(
+          resetError,
+          "We couldn’t restart sign-in. Please try again."
+        )
+      );
+    }
+  };
+
+  const title = isMfaStep
+    ? "One more step"
+    : showNewPassword
+      ? "Choose a new password"
+      : step === "email-code" || step === "reset-code"
+        ? step === "email-code"
+          ? "Check your inbox"
+          : "Verify your email"
+        : step === "password"
+          ? "Welcome back"
+          : "Sign in";
+  const subtitle = isMfaStep
+    ? "Verify it’s really you to keep your account secure."
+    : showNewPassword
+      ? "Create a new password to protect your account."
+      : step === "email-code"
+        ? `Enter the sign-in code sent to ${normalizeEmail(emailAddress)}.`
+        : step === "reset-code"
+          ? `Enter the recovery code sent to ${normalizeEmail(emailAddress)}.`
+          : "Sign in to continue managing your subscriptions.";
+
   return (
-    <SafeAreaView className="flex-1 bg-background">
-      <KeyboardAvoidingView
-        className="flex-1"
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
-        <ScrollView
-          contentContainerClassName="auth-content grow"
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <View className="auth-brand-block">
-            <View className="auth-logo-wrap">
-              <View className="auth-logo-mark">
-                <Text className="auth-logo-mark-text">R</Text>
+    <AuthScreen title={title} subtitle={subtitle}>
+      <View className="auth-form">
+        {isMfaStep ? (
+          <>
+            {supportedMfaStrategies.length > 1 ? (
+              <View className="gap-2">
+                <Text className="auth-label">Choose a verification method</Text>
+                <View className="flex-row flex-wrap gap-2">
+                  {supportedMfaStrategies.map((strategy) => (
+                    <Pressable
+                      key={strategy}
+                      className={`auth-method-chip ${
+                        activeMfaStrategy === strategy
+                          ? "auth-method-chip-active"
+                          : ""
+                      }`}
+                      onPress={() => {
+                        setSelectedMfaStrategy(strategy);
+                        setMfaCodeSent(false);
+                        setCode("");
+                        setError("");
+                      }}
+                      accessibilityRole="button"
+                      accessibilityState={{
+                        selected: activeMfaStrategy === strategy,
+                      }}
+                    >
+                      <Text
+                        className={`auth-method-chip-text ${
+                          activeMfaStrategy === strategy
+                            ? "auth-method-chip-text-active"
+                            : ""
+                        }`}
+                      >
+                        {mfaLabel(strategy)}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
               </View>
-              <View>
-                <Text className="auth-wordmark">Recurly</Text>
-                <Text className="auth-wordmark-sub">Smart Billing</Text>
-              </View>
-            </View>
+            ) : null}
 
-            <Text className="auth-title">Welcome back</Text>
-            <Text className="auth-subtitle">
-              Sign in to continue managing your subscriptions
-            </Text>
-          </View>
-
-          <View className="auth-card">
-            <View className="auth-form">
-              <View className="auth-field">
-                <Text className="auth-label">Email</Text>
-                <TextInput
-                  className="auth-input"
-                  placeholder="Enter your email"
-                  placeholderTextColor="rgba(8, 17, 38, 0.4)"
-                  autoCapitalize="none"
-                  autoComplete="email"
-                  keyboardType="email-address"
-                  value={emailAddress}
-                  onChangeText={setEmailAddress}
-                />
-              </View>
-
-              <View className="auth-field">
-                <Text className="auth-label">Password</Text>
-                <TextInput
-                  className="auth-input"
-                  placeholder="Enter your password"
-                  placeholderTextColor="rgba(8, 17, 38, 0.4)"
-                  secureTextEntry
-                  autoComplete="password"
-                  value={password}
-                  onChangeText={setPassword}
-                />
-              </View>
-
-              {error ? <Text className="auth-error">{error}</Text> : null}
-
+            {activeMfaStrategy &&
+            (activeMfaStrategy === "email_code" ||
+              activeMfaStrategy === "phone_code") &&
+            !mfaCodeSent ? (
               <Pressable
                 className={`auth-button ${loading ? "auth-button-disabled" : ""}`}
-                onPress={onSignInPress}
+                onPress={handleSendMfaCode}
                 disabled={loading}
+                accessibilityRole="button"
               >
                 {loading ? (
                   <ActivityIndicator color="#081126" />
                 ) : (
-                  <Text className="auth-button-text">Sign in</Text>
+                  <Text className="auth-button-text">
+                    Send {activeMfaStrategy === "email_code" ? "email" : "text"}{" "}
+                    code
+                  </Text>
                 )}
               </Pressable>
-
-              <View className="auth-link-row">
-                <Text className="auth-link-copy">New to Recurly?</Text>
-                <Link href="/(auth)/sign-up" className="auth-link">
-                  Create an account
-                </Link>
-              </View>
+            ) : activeMfaStrategy ? (
+              <>
+                <View className="auth-field">
+                  <Text className="auth-label">
+                    {activeMfaStrategy === "totp"
+                      ? "Authenticator code"
+                      : activeMfaStrategy === "backup_code"
+                        ? "Backup code"
+                        : "Verification code"}
+                  </Text>
+                  <TextInput
+                    className="auth-input"
+                    placeholder="Enter your code"
+                    placeholderTextColor="rgba(8, 17, 38, 0.4)"
+                    autoCapitalize="characters"
+                    autoComplete="one-time-code"
+                    keyboardType="default"
+                    value={code}
+                    onChangeText={(value) => {
+                      setCode(value);
+                      setError("");
+                    }}
+                    returnKeyType="done"
+                    onSubmitEditing={handleVerifyMfa}
+                    accessibilityLabel="Verification code"
+                  />
+                </View>
+                <Pressable
+                  className={`auth-button ${loading ? "auth-button-disabled" : ""}`}
+                  onPress={handleVerifyMfa}
+                  disabled={loading}
+                  accessibilityRole="button"
+                >
+                  {loading ? (
+                    <ActivityIndicator color="#081126" />
+                  ) : (
+                    <Text className="auth-button-text">Verify and continue</Text>
+                  )}
+                </Pressable>
+                {activeMfaStrategy === "email_code" ||
+                activeMfaStrategy === "phone_code" ? (
+                  <Pressable
+                    onPress={handleSendMfaCode}
+                    disabled={loading}
+                    accessibilityRole="button"
+                  >
+                    <Text className="auth-link text-center">Resend code</Text>
+                  </Pressable>
+                ) : null}
+              </>
+            ) : (
+              <Text className="auth-helper">
+                No supported verification method is available for this account.
+                Please contact support.
+              </Text>
+            )}
+            <Pressable onPress={handleChangeEmail} disabled={loading}>
+              <Text className="auth-link text-center">Use a different account</Text>
+            </Pressable>
+          </>
+        ) : showNewPassword ? (
+          <>
+            <View className="auth-field">
+              <Text className="auth-label">New password</Text>
+              <TextInput
+                className="auth-input"
+                placeholder="At least 8 characters"
+                placeholderTextColor="rgba(8, 17, 38, 0.4)"
+                secureTextEntry
+                autoCapitalize="none"
+                autoComplete="new-password"
+                value={newPassword}
+                onChangeText={(value) => {
+                  setNewPassword(value);
+                  setError("");
+                }}
+                returnKeyType="next"
+                accessibilityLabel="New password"
+              />
             </View>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
-  );
-};
+            <View className="auth-field">
+              <Text className="auth-label">Confirm new password</Text>
+              <TextInput
+                className="auth-input"
+                placeholder="Enter your password again"
+                placeholderTextColor="rgba(8, 17, 38, 0.4)"
+                secureTextEntry
+                autoCapitalize="none"
+                autoComplete="new-password"
+                value={confirmPassword}
+                onChangeText={(value) => {
+                  setConfirmPassword(value);
+                  setError("");
+                }}
+                returnKeyType="done"
+                onSubmitEditing={handleSubmitNewPassword}
+                accessibilityLabel="Confirm new password"
+              />
+            </View>
+            <Pressable
+              className={`auth-button ${loading ? "auth-button-disabled" : ""}`}
+              onPress={handleSubmitNewPassword}
+              disabled={loading}
+              accessibilityRole="button"
+            >
+              {loading ? (
+                <ActivityIndicator color="#081126" />
+              ) : (
+                <Text className="auth-button-text">Update password</Text>
+              )}
+            </Pressable>
+          </>
+        ) : step === "email-code" || step === "reset-code" ? (
+          <>
+            <View className="auth-field">
+              <Text className="auth-label">
+                {step === "email-code" ? "Sign-in code" : "Recovery code"}
+              </Text>
+              <TextInput
+                className="auth-input"
+                placeholder="Enter the code"
+                placeholderTextColor="rgba(8, 17, 38, 0.4)"
+                autoCapitalize="none"
+                autoComplete="one-time-code"
+                keyboardType="number-pad"
+                value={code}
+                onChangeText={(value) => {
+                  setCode(value);
+                  setError("");
+                }}
+                returnKeyType="done"
+                onSubmitEditing={handleVerifyCode}
+                accessibilityLabel={
+                  step === "email-code" ? "Sign-in code" : "Recovery code"
+                }
+              />
+            </View>
+            {error ? <Text className="auth-error">{error}</Text> : null}
+            <Pressable
+              className={`auth-button ${loading ? "auth-button-disabled" : ""}`}
+              onPress={handleVerifyCode}
+              disabled={loading}
+              accessibilityRole="button"
+            >
+              {loading ? (
+                <ActivityIndicator color="#081126" />
+              ) : (
+                <Text className="auth-button-text">
+                  {step === "email-code" ? "Verify and sign in" : "Verify code"}
+                </Text>
+              )}
+            </Pressable>
+            <View className="auth-link-row">
+              <Text className="auth-link-copy">Didn’t receive a code?</Text>
+              <Pressable onPress={handleResendCode} disabled={loading}>
+                <Text className="auth-link">Resend</Text>
+              </Pressable>
+            </View>
+            <Pressable onPress={handleChangeEmail} disabled={loading}>
+              <Text className="auth-link text-center">Use a different email</Text>
+            </Pressable>
+          </>
+        ) : (
+          <>
+            <View className="auth-field">
+              <Text className="auth-label">Email</Text>
+              <TextInput
+                className="auth-input"
+                placeholder="you@example.com"
+                placeholderTextColor="rgba(8, 17, 38, 0.4)"
+                autoCapitalize="none"
+                autoComplete="email"
+                keyboardType="email-address"
+                textContentType="emailAddress"
+                value={emailAddress}
+                onChangeText={(value) => {
+                  setEmailAddress(value);
+                  setError("");
+                }}
+                returnKeyType="next"
+                accessibilityLabel="Email address"
+              />
+            </View>
+            <View className="auth-field">
+              <Text className="auth-label">Password</Text>
+              <TextInput
+                className="auth-input"
+                placeholder="Enter your password"
+                placeholderTextColor="rgba(8, 17, 38, 0.4)"
+                secureTextEntry
+                autoCapitalize="none"
+                autoComplete="current-password"
+                textContentType="password"
+                value={password}
+                onChangeText={(value) => {
+                  setPassword(value);
+                  setError("");
+                }}
+                returnKeyType="done"
+                onSubmitEditing={handlePasswordSignIn}
+                accessibilityLabel="Password"
+              />
+            </View>
+            <View className="items-end">
+              <Pressable
+                onPress={handleRequestPasswordReset}
+                disabled={loading}
+                accessibilityRole="button"
+              >
+                <Text className="auth-link">Forgot password?</Text>
+              </Pressable>
+            </View>
+            {error ? <Text className="auth-error">{error}</Text> : null}
+            <Pressable
+              className={`auth-button ${loading ? "auth-button-disabled" : ""}`}
+              onPress={handlePasswordSignIn}
+              disabled={loading}
+              accessibilityRole="button"
+            >
+              {loading ? (
+                <ActivityIndicator color="#081126" />
+              ) : (
+                <Text className="auth-button-text">Sign in</Text>
+              )}
+            </Pressable>
+            <Pressable
+              className="auth-secondary-button"
+              onPress={handleSendEmailCode}
+              disabled={loading}
+              accessibilityRole="button"
+            >
+              <Text className="auth-secondary-button-text">
+                Sign in with an email code
+              </Text>
+            </Pressable>
+            <View className="auth-link-row">
+              <Text className="auth-link-copy">New to Recurly?</Text>
+              <Link href="/(auth)/sign-up" className="auth-link">
+                Create an account
+              </Link>
+            </View>
+          </>
+        )}
 
-export default SignIn;
+        {error && (isMfaStep || showNewPassword) ? (
+          <Text className="auth-error">{error}</Text>
+        ) : null}
+      </View>
+    </AuthScreen>
+  );
+}

@@ -12,7 +12,7 @@ import ListHeading from "../../../components/ListHeading";
 import UpcomingSubscriptionCard from "../../../components/UpcomingSubscriptionCard";
 import SubscriptionCard from "./../../../components/SubscriptionCard";
 import {useState} from "react";
-import { posthog, posthogLog } from "../../../lib/posthog";
+import { posthog } from "../../../lib/posthog";
 const SafeAreaView = styled(RnSafeAreaView);
  
 /**
@@ -31,7 +31,6 @@ export default function App() {
 
   const handleSubscriptionPress = (subscriptionId: string) => {
     if (expandedSubscriptionId !== subscriptionId) {
-      posthogLog.info("subscription details opened", { screen: "dashboard" });
       posthog?.capture("subscription_details_opened", {
         subscription_id: subscriptionId,
       });

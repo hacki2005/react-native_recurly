@@ -1,4 +1,4 @@
-import PostHog from 'posthog-react-native'
+import PostHog, { PostHogPersistedProperty } from 'posthog-react-native'
 
 const projectToken = process.env.EXPO_PUBLIC_POSTHOG_KEY
 const host = process.env.EXPO_PUBLIC_POSTHOG_HOST
@@ -20,10 +20,6 @@ export const posthog = missingConfiguration
   : new PostHog(projectToken, {
       host,
       captureAppLifecycleEvents: true,
-      logs: {
-        serviceName: 'recurrly-mobile',
-        environment: __DEV__ ? 'development' : 'production',
-      },
       errorTracking: {
         autocapture: {
           uncaughtExceptions: true,
@@ -33,7 +29,14 @@ export const posthog = missingConfiguration
       },
     })
 
-export const posthogLog = {
-  info: (message: string, attributes: Record<string, string>) =>
-    posthog?.logger.info(message, attributes),
+if (posthog) {
+  // Analytics are captured as events; discard logs queued by the removed OTLP logger.
+  void posthog
+    .ready()
+    .then(() => {
+      posthog.setPersistedProperty(PostHogPersistedProperty.LogsQueue, [])
+    })
+    .catch((error: unknown) => {
+      console.error("Failed to clear pending PostHog logs", error)
+    })
 }

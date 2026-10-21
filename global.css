@@ -274,6 +274,10 @@
         @apply mt-2 max-w-[320px] text-center text-base font-sans-medium text-muted-foreground;
     }
 
+    .auth-trust-note {
+        @apply mt-5 text-center text-xs font-sans-medium text-muted-foreground;
+    }
+
     .auth-card {
         @apply mt-8 rounded-3xl border border-border bg-card p-5;
     }
@@ -324,6 +328,22 @@
 
     .auth-secondary-button-text {
         @apply text-sm font-sans-semibold text-accent;
+    }
+
+    .auth-method-chip {
+        @apply rounded-full border border-border bg-background px-4 py-2;
+    }
+
+    .auth-method-chip-active {
+        @apply border-accent bg-accent/10;
+    }
+
+    .auth-method-chip-text {
+        @apply text-sm font-sans-semibold text-muted-foreground;
+    }
+
+    .auth-method-chip-text-active {
+        @apply text-accent;
     }
 
     .auth-divider-row {
@@ -418,6 +438,5 @@
         @apply text-accent;
     }
 }
-
 
 
