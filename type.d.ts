@@ -22,6 +22,7 @@ declare global {
         status?: string;
         startDate?: string;
         price: number;
+        frequency?: "Monthly" | "Yearly";
         currency?: string;
         billing: string;
         renewalDate?: string;
@@ -41,6 +42,7 @@ declare global {
         name: string;
         price: number;
         currency?: string;
+        renewalDate: string;
         daysLeft: number;
     }
 
@@ -49,6 +51,7 @@ declare global {
 
     interface ListHeadingProps {
         title: string;
+        onPress?: () => void;
     }
 }
 
