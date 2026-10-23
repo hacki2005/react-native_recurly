@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "react_native-recurrly",
+    "name": "Recurrly",
     "slug": "react_native-recurrly",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -8,9 +8,11 @@
     "scheme": "reactnativerecurrly",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "bundleIdentifier": "com.hari.recurrly",
+      "icon": "./assets/icons/logo.png"
     },
     "android": {
+      "package": "com.hari.recurrly",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -29,7 +31,7 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#208AEF",
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/splash-pattern.png",
           "imageWidth": 76
         }
       ],
@@ -52,6 +54,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "1599ec8b-6ffe-4a54-bb4e-30ff5f9353d7"
+      }
     }
   }
 }
