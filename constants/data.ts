@@ -1,3 +1,5 @@
+import { useSyncExternalStore } from "react";
+
 import { icons } from "./icons";
 
 const getRenewalDate = (daysFromToday: number) => {
@@ -123,3 +125,21 @@ export const HOME_SUBSCRIPTIONS: Subscription[] = [
         color: "#b8e8d0",
     },
 ];
+
+let subscriptions = HOME_SUBSCRIPTIONS;
+const subscriptionListeners = new Set<() => void>();
+
+const subscribeToSubscriptions = (listener: () => void) => {
+    subscriptionListeners.add(listener);
+    return () => subscriptionListeners.delete(listener);
+};
+
+const getSubscriptions = () => subscriptions;
+
+export const addSubscription = (subscription: Subscription) => {
+    subscriptions = [subscription, ...subscriptions];
+    subscriptionListeners.forEach((listener) => listener());
+};
+
+export const useSubscriptions = () =>
+    useSyncExternalStore(subscribeToSubscriptions, getSubscriptions, getSubscriptions);

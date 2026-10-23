@@ -4,11 +4,12 @@ import { FlatList, Text, TextInput, View } from "react-native";
 import { SafeAreaView as RnSafeAreaView } from "react-native-safe-area-context";
 import { styled } from "nativewind";
 import SubscriptionCard from "../../../components/SubscriptionCard";
-import { HOME_SUBSCRIPTIONS } from "../../../constants/data";
+import { useSubscriptions } from "../../../constants/data";
 
 const SafeAreaView = styled(RnSafeAreaView);
 
 const Subscriptions = () => {
+  const subscriptions = useSubscriptions();
   const [query, setQuery] = useState("");
   const [expandedSubscriptionId, setExpandedSubscriptionId] = useState<
     string | null
@@ -16,9 +17,9 @@ const Subscriptions = () => {
 
   const filteredSubscriptions = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase();
-    if (!normalizedQuery) return HOME_SUBSCRIPTIONS;
+    if (!normalizedQuery) return subscriptions;
 
-    return HOME_SUBSCRIPTIONS.filter((subscription) =>
+    return subscriptions.filter((subscription) =>
       [
         subscription.name,
         subscription.category,
@@ -28,7 +29,7 @@ const Subscriptions = () => {
         subscription.billing,
       ].some((value) => value?.toLocaleLowerCase().includes(normalizedQuery))
     );
-  }, [query]);
+  }, [query, subscriptions]);
 
   const handleSubscriptionPress = (subscriptionId: string) => {
     setExpandedSubscriptionId((currentId) =>
